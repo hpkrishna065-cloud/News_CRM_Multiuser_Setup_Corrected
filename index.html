@@ -1107,10 +1107,68 @@ function seedAdminData(){
 }
 
 /* Each user's tables live here, keyed by username, isolated from one another. */
+function seedTamilMagazineUserData(){
+  const d = emptyUserData();
+  // Tamil sample magazines covering all supported subscription types.
+  // Shared by sri123 and guru123.
+  d.masters.magazines = [
+    // Daily
+    { code:'MAG-006', name:'தினத்தந்தி', magType:'Daily', shortName1:'DT', shortName2:'Dhinathanthi', supplyStatus:'Supply', commission:10,
+      rates:{sun:7,mon:7,tue:7,wed:7,thu:7,fri:7,sat:7} },
+    { code:'MAG-007', name:'தினமலர்', magType:'Daily', shortName1:'DMLR', shortName2:'Dinamalar', supplyStatus:'Supply', commission:10,
+      rates:{sun:7,mon:7,tue:7,wed:7,thu:7,fri:7,sat:7} },
+    { code:'MAG-008', name:'தினமணி', magType:'Daily', shortName1:'DMNI', shortName2:'Dinamani', supplyStatus:'Supply', commission:10,
+      rates:{sun:6,mon:6,tue:6,wed:6,thu:6,fri:6,sat:6} },
+    { code:'MAG-009', name:'தினகரன்', magType:'Daily', shortName1:'DKN', shortName2:'Dinakaran', supplyStatus:'Supply', commission:10,
+      rates:{sun:7,mon:7,tue:7,wed:7,thu:7,fri:7,sat:7} },
+    { code:'MAG-010', name:'இந்து தமிழ் திசை', magType:'Daily', shortName1:'HT', shortName2:'Hindu Tamil Thisai', supplyStatus:'Supply', commission:10,
+      rates:{sun:7,mon:7,tue:7,wed:7,thu:7,fri:7,sat:7} },
+
+    // Weekly delivery - Odd Week
+    { code:'MAG-011', name:'ஆனந்த விகடன்', magType:'Odd-Week', shortName1:'AV', shortName2:'Ananda Vikatan', supplyStatus:'Supply', commission:10,
+      rates:{sun:35,mon:35,tue:35,wed:35,thu:35,fri:35,sat:35} },
+    { code:'MAG-012', name:'குமுதம்', magType:'Odd-Week', shortName1:'KM', shortName2:'Kumudam', supplyStatus:'Supply', commission:10,
+      rates:{sun:35,mon:35,tue:35,wed:35,thu:35,fri:35,sat:35} },
+    { code:'MAG-013', name:'கல்கி', magType:'Odd-Week', shortName1:'KALKI', shortName2:'Kalki', supplyStatus:'Supply', commission:10,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+    { code:'MAG-014', name:'குங்குமம்', magType:'Odd-Week', shortName1:'KGM', shortName2:'Kungumam', supplyStatus:'Supply', commission:10,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+    { code:'MAG-015', name:'நக்கீரன்', magType:'Odd-Week', shortName1:'NKR', shortName2:'Nakkheeran', supplyStatus:'Supply', commission:10,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+
+    // Weekly delivery - Even Week
+    { code:'MAG-016', name:'ஜூனியர் விகடன்', magType:'Even-Week', shortName1:'JV', shortName2:'Junior Vikatan', supplyStatus:'Supply', commission:10,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+    { code:'MAG-017', name:'சுட்டி விகடன்', magType:'Even-Week', shortName1:'CV', shortName2:'Chutti Vikatan', supplyStatus:'Supply', commission:10,
+      rates:{sun:25,mon:25,tue:25,wed:25,thu:25,fri:25,sat:25} },
+    { code:'MAG-018', name:'நாணயம் விகடன்', magType:'Even-Week', shortName1:'NV', shortName2:'Naanayam Vikatan', supplyStatus:'Supply', commission:10,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+
+    // 15 Days Once / Fortnightly
+    { code:'MAG-019', name:'அவள் விகடன்', magType:'15 Days Once', shortName1:'AVK', shortName2:'Aval Vikatan', supplyStatus:'Direct', commission:12,
+      rates:{sun:35,mon:35,tue:35,wed:35,thu:35,fri:35,sat:35} },
+    { code:'MAG-020', name:'சக்தி விகடன்', magType:'15 Days Once', shortName1:'SV', shortName2:'Sakthi Vikatan', supplyStatus:'Direct', commission:12,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+    { code:'MAG-021', name:'பசுமை விகடன்', magType:'15 Days Once', shortName1:'PV', shortName2:'Pasumai Vikatan', supplyStatus:'Direct', commission:12,
+      rates:{sun:30,mon:30,tue:30,wed:30,thu:30,fri:30,sat:30} },
+    { code:'MAG-022', name:'குமுதம் பக்தி ஸ்பெஷல்', magType:'15 Days Once', shortName1:'KBS', shortName2:'Kumudam Bhakti Special', supplyStatus:'Direct', commission:12,
+      rates:{sun:35,mon:35,tue:35,wed:35,thu:35,fri:35,sat:35} },
+
+    // Monthly Once
+    { code:'MAG-023', name:'மோட்டார் விகடன்', magType:'Monthly Once', shortName1:'MV', shortName2:'Motor Vikatan', supplyStatus:'Direct', commission:15,
+      rates:{sun:60,mon:60,tue:60,wed:60,thu:60,fri:60,sat:60} },
+    { code:'MAG-024', name:'மங்கையர் மலர்', magType:'Monthly Once', shortName1:'MM', shortName2:'Mangayar Malar', supplyStatus:'Direct', commission:15,
+      rates:{sun:45,mon:45,tue:45,wed:45,thu:45,fri:45,sat:45} },
+    { code:'MAG-025', name:'குமுதம் அருசுவை', magType:'Monthly Once', shortName1:'KA', shortName2:'Kumudam Arusuvai', supplyStatus:'Direct', commission:15,
+      rates:{sun:40,mon:40,tue:40,wed:40,thu:40,fri:40,sat:40} }
+  ];
+  return d;
+}
+
 const userDataStore = {
   admin: seedAdminData(),
-  sri123: emptyUserData(),
-  guru123: emptyUserData(),
+  sri123: seedTamilMagazineUserData(),
+  guru123: seedTamilMagazineUserData(),
 };
 
 let state = {
@@ -2342,6 +2400,9 @@ function saveMagazine(){
   if(!magDraft.name || !magDraft.name.trim()){ return fieldError('magNameInput','Magazine Name is required.'); }
   if(!magDraft.code || !magDraft.code.trim()){ return fieldError('magCodeInput','Magazine Code is required.'); }
   const isNew = !state.magUI.editingId;
+  // Every newly created magazine must start with Commission = 0.
+  // This applies independently to Admin, sri123 and guru123 data sets.
+  if(isNew){ magDraft.commission = 0; }
   const dupIdx = state.masters.magazines.findIndex(m=>m.code===magDraft.code);
   if(isNew && dupIdx>=0){ return fieldError('magCodeInput','This Magazine Code already exists.'); }
   if(isNew){
@@ -2396,7 +2457,7 @@ function magazineFormHTML(){
         <div class="old-style-row"><label>Short Name 1</label><input type="text" value="${esc(d.shortName1)}" ${dis} oninput="updateMagDraft('shortName1',this.value)"></div>
         <div class="old-style-row"><label>Short Name 2</label><input type="text" value="${esc(d.shortName2)}" ${dis} oninput="updateMagDraft('shortName2',this.value)"></div>
         <div class="old-style-row"><label>Supply Status</label><select ${dis} onchange="updateMagDraft('supplyStatus',this.value)">${supplyOptions}</select></div>
-        <div class="old-style-row"><label>Commission</label><input type="number" step="0.01" value="${d.commission||0}" ${dis} oninput="updateMagDraftNum('commission',this.value)"></div>
+        <div class="old-style-row"><label>Commission</label><input type="number" step="0.01" value="${isNew ? 0 : (d.commission ?? 0)}" ${dis} oninput="updateMagDraftNum('commission',this.value)"></div>
       </div>
 
       <div class="card">
@@ -4206,20 +4267,42 @@ function formatBillPeriodLabel(startStr, endStr){
   return `${formatDateDisplay(startStr)} – ${formatDateDisplay(endStr)}`;
 }
 
-// Invoice-facing view of a bill's breakdown: the "Service Charge" row is
-// never shown as its own line on the invoice — its value is folded into the
-// first daily-purchased-magazine row instead, so the printed/whatsapp total
-// still matches billAmount(b) exactly. (Internal records — Bill Status /
-// Bill Detail / reports — still keep Service Charge as its own field.)
+// Invoice-facing view of a bill's breakdown.
+// Service Charge is added to the FIRST magazine item only.
+// It must never be distributed across, or added to, the remaining items.
+// Internal Bill Status / Bill Detail / reports continue to keep Service Charge
+// as a separate field.
 function invoiceDisplayBreakdown(b){
-  const breakdown = (b.breakdown && b.breakdown.length) ? b.breakdown.map(row=>({...row})) : [{ magazineName:'Delivery charges', qty:'—', value: billAmount(b) }];
-  const scIdx = breakdown.findIndex(r=>r.magazineName==='Service Charge');
-  if(scIdx>=0){
-    const scRow = breakdown.splice(scIdx,1)[0];
-    const magRow = breakdown.find(r=> r.magazineName!=='Old Balance' && !String(r.magazineName).startsWith('Less: Hold'));
-    if(magRow){ magRow.value = Number(magRow.value||0) + Number(scRow.value||0); }
-    else { breakdown.unshift({ magazineName:'Magazine Amount', qty:'—', value:Number(scRow.value||0) }); }
+  const breakdown = (b.breakdown && b.breakdown.length)
+    ? b.breakdown.map(row=>({...row}))
+    : [{ magazineName:'Delivery charges', qty:'—', value: billAmount(b) }];
+
+  const scIdx = breakdown.findIndex(r => r.magazineName === 'Service Charge');
+
+  if(scIdx >= 0){
+    const scRow = breakdown.splice(scIdx, 1)[0];
+
+    // Find ONLY the first actual magazine row.
+    // Do not add the service charge to hold/old-balance rows or later magazines.
+    const firstMagazineRow = breakdown.find(row =>
+      row.magazineName !== 'Old Balance' &&
+      !String(row.magazineName).startsWith('Less: Hold') &&
+      row.magazineName !== 'Service Charge'
+    );
+
+    if(firstMagazineRow){
+      firstMagazineRow.value =
+        Number(firstMagazineRow.value || 0) + Number(scRow.value || 0);
+    } else {
+      // If there is no magazine item, keep the service charge visible once.
+      breakdown.unshift({
+        magazineName:'Service Charge',
+        qty:'—',
+        value:Number(scRow.value || 0)
+      });
+    }
   }
+
   return breakdown;
 }
 
