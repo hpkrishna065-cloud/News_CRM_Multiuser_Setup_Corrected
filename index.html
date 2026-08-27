@@ -2021,8 +2021,19 @@ function handleAreaChange(code){
 
 function handleMagazineChange(code){
   const mag = state.masters.magazines.find(m=>m.code===code);
+  const existing = subDraft.items.find(it=>it.magazineCode===code);
+  if(existing){
+    // Re-selecting a magazine already in the list should load its saved
+    // values for editing — otherwise the qty grid resets to 0 and clicking
+    // "+ Add Item" again would silently wipe out the existing quantities.
+    itemDraft = JSON.parse(JSON.stringify(existing));
+    renderSubscriberModule();
+    return;
+  }
   itemDraft.magazineCode = code;
   itemDraft.magazineName = mag ? mag.name : '';
+  itemDraft.salesState = 'YES';
+  itemDraft.qty = {sun:0,mon:0,tue:0,wed:0,thu:0,fri:0,sat:0};
   itemDraft.scheduleAnchorDate = (mag && ['15 Days Once','Monthly Once'].includes(mag.magType))
     ? (subDraft.startDate || todayISO())
     : '';
@@ -2030,11 +2041,8 @@ function handleMagazineChange(code){
   // For non-daily titles, give the user one sensible default delivery copy
   // on the subscriber's start-date weekday. The user can change the quantity.
   if(mag && mag.magType!=='Daily'){
-    const hasQty = Object.values(itemDraft.qty).some(v=>Number(v||0)>0);
-    if(!hasQty){
-      const anchorDay = weekdayKeyForDate(subDraft.startDate || todayISO());
-      itemDraft.qty[anchorDay] = 1;
-    }
+    const anchorDay = weekdayKeyForDate(subDraft.startDate || todayISO());
+    itemDraft.qty[anchorDay] = 1;
   }
   renderSubscriberModule();
 }
@@ -2709,16 +2717,42 @@ function areaFormHTML(){
    SUPPLIER ENTRY MODULE
    ============================================================ */
 function blankSupItemDraft(){
-  const firstMag = state.masters.magazines[0];
-  return { magazineCode: firstMag ? firstMag.code : '', magazineName: firstMag ? firstMag.name : '' };
+  return {
+    magazineCode: '',
+    magazineName: '',
+    salesState:'YES',
+    qty:{sun:0,mon:0,tue:0,wed:0,thu:0,fri:0,sat:0}
+  };
 }
 
 function blankSupDraft(){
   const nextNum = 1 + state.masters.suppliers.length;
   return {
     code:'SUP-'+String(nextNum).padStart(4,'0'), entryDate: todayISO(), name:'',
-    address1:'', address2:'', phone:'', gstin:'', items:[]
+    address1:'', address2:'', phone:'', gstin:'', startDate: todayISO(), endDate:'', items:[], holds:[]
   };
+}
+
+// Same shape/behaviour as blankHoldDraft() used by Subscriber Entry — kept as a
+// separate draft object so the Supplier form's Hold/Resume card never collides
+// with the Subscriber form's hold state.
+function blankSupHoldDraft(){ return { startDate: todayISO(), endDate: todayISO(), reason:'' }; }
+let supHoldDraft = null;
+
+function updateSupHoldDraft(field,value){ if(supHoldDraft) supHoldDraft[field]=value; }
+
+function addSupHoldToList(){
+  clearFieldErrors();
+  if(!supHoldDraft.startDate || !supHoldDraft.endDate){ return fieldError('supHoldFromInput','Please set both a Hold From and Hold To date.'); }
+  if(supHoldDraft.endDate < supHoldDraft.startDate){ return fieldError('supHoldToInput','Hold To date cannot be before Hold From date.'); }
+  if(!supDraft.holds){ supDraft.holds = []; }
+  supDraft.holds.push({ id:'HLD-'+Date.now(), startDate:supHoldDraft.startDate, endDate:supHoldDraft.endDate, reason:supHoldDraft.reason });
+  supHoldDraft = blankSupHoldDraft();
+  renderSupplierModule();
+}
+function removeSupHoldFromList(holdId){
+  supDraft.holds = (supDraft.holds||[]).filter(h=>h.id!==holdId);
+  renderSupplierModule();
 }
 
 function renderSupplierModule(){
@@ -2799,34 +2833,59 @@ function openSupplierForm(code, readonly){
     const rec = state.masters.suppliers.find(s=>s.code===code);
     supDraft = JSON.parse(JSON.stringify(rec));
     if(!supDraft.items) supDraft.items = [];
+    if(!supDraft.holds) supDraft.holds = [];
+    if(supDraft.startDate===undefined) supDraft.startDate = '';
+    if(supDraft.endDate===undefined) supDraft.endDate = '';
   } else {
     supDraft = blankSupDraft();
   }
   supItemDraft = blankSupItemDraft();
+  supHoldDraft = blankSupHoldDraft();
   renderSupplierModule();
 }
 
 function closeSupplierForm(){
   state.supUI.view='list'; state.supUI.editingId=null; state.supUI.readonly=false;
-  supDraft=null; supItemDraft=null;
+  supDraft=null; supItemDraft=null; supHoldDraft=null;
   renderSupplierModule();
 }
+
+function updateSupItemQty(day,value){ if(supItemDraft) supItemDraft.qty[day] = value===''?0:Number(value); }
+function updateSupItemDraft(field,value){ if(supItemDraft) supItemDraft[field]=value; }
 
 function updateSupDraft(field,value){ if(supDraft) supDraft[field]=value; }
 
 function handleSupMagazineChange(code){
   const mag = state.masters.magazines.find(m=>m.code===code);
+  const existing = supDraft.items.find(it=>it.magazineCode===code);
+  if(existing){
+    // Re-selecting a magazine already in the list should load its saved
+    // values for editing — otherwise the qty grid resets to 0 and clicking
+    // "+ Add Item" again would silently wipe out the existing quantities.
+    supItemDraft = JSON.parse(JSON.stringify(existing));
+    renderSupplierModule();
+    return;
+  }
   supItemDraft.magazineCode = code;
   supItemDraft.magazineName = mag ? mag.name : '';
+  supItemDraft.salesState = 'YES';
+  supItemDraft.qty = {sun:0,mon:0,tue:0,wed:0,thu:0,fri:0,sat:0};
+
+  // For non-daily titles, give a sensible default supply copy on today's
+  // weekday, mirroring the convenience default used in Subscriber Entry.
+  if(mag && mag.magType!=='Daily'){
+    const anchorDay = weekdayKeyForDate(todayISO());
+    supItemDraft.qty[anchorDay] = 1;
+  }
   renderSupplierModule();
 }
 
 function addSupItemToList(){
   clearFieldErrors();
   if(!supItemDraft.magazineCode){ return fieldError('supMagSelect','Please select a Magazine first.'); }
-  const exists = supDraft.items.some(it=>it.magazineCode===supItemDraft.magazineCode);
-  if(exists){ return fieldError('supMagSelect','This magazine is already in the list.'); }
-  supDraft.items.push(JSON.parse(JSON.stringify(supItemDraft)));
+  const idx = supDraft.items.findIndex(it=>it.magazineCode===supItemDraft.magazineCode);
+  if(idx>=0){ supDraft.items[idx] = JSON.parse(JSON.stringify(supItemDraft)); }
+  else{ supDraft.items.push(JSON.parse(JSON.stringify(supItemDraft))); }
   supItemDraft = blankSupItemDraft();
   renderSupplierModule();
 }
@@ -2872,13 +2931,27 @@ function supplierFormHTML(){
     `<option value="${m.code}" ${supItemDraft.magazineCode===m.code?'selected':''}>${m.code} — ${esc(m.name)}</option>`
   ).join('');
 
-  const itemsRows = d.items.length ? d.items.map(it=>`
-    <tr>
+  const itemsRows = d.items.length ? d.items.map(it=>{
+    const mag = state.masters.magazines.find(m=>m.code===it.magazineCode);
+    const type = mag ? (mag.magType||'Daily') : 'Daily';
+    const total = Object.values(it.qty||{}).reduce((a,b)=>a+Number(b||0),0);
+    return `<tr>
       <td style="font-family:var(--font-mono);">${esc(it.magazineCode)}</td>
       <td>${esc(it.magazineName)}</td>
+      <td>${esc(type)}</td>
+      <td>${it.salesState==='YES' ? 'Yes':'No'}</td>
+      <td style="text-align:center;">${total}</td>
       <td style="text-align:right;">${ro ? '' : `<button class="icon-btn" title="Remove" aria-label="Remove magazine from supplier list" onclick="removeSupItemFromList('${it.magazineCode}')">✕</button>`}</td>
-    </tr>
-  `).join('') : `<tr><td colspan="3"><div class="empty-note" style="padding:18px;"><b>No magazines added yet</b>Select a magazine on the right and click "Add Item".</div></td></tr>`;
+    </tr>`;
+  }).join('') : `<tr><td colspan="5"><div class="empty-note" style="padding:18px;"><b>No magazines added yet</b>Select a magazine on the right and click "Add Item".</div></td></tr>`;
+
+  const supHolds = d.holds || [];
+  const supHoldsRows = supHolds.length ? supHolds.map(h=>`<tr>
+      <td>${formatDateDisplay(h.startDate)}</td>
+      <td>${formatDateDisplay(h.endDate)}</td>
+      <td>${esc(h.reason)||'—'}</td>
+      <td style="text-align:right;">${ro ? '' : `<button class="icon-btn" title="Remove" aria-label="Remove hold period" onclick="removeSupHoldFromList('${h.id}')">✕</button>`}</td>
+    </tr>`).join('') : `<tr><td colspan="4"><div class="empty-note" style="padding:18px;"><b>No hold periods</b>Copies are supplied on every scheduled day. Add a Hold From/To date below to skip a range (e.g. supplier's stock unavailable).</div></td></tr>`;
 
   return `
     <div class="breadcrumb">Master <b>›</b> Supplier Entry <b>›</b> ${isNew ? 'New' : (ro?'View':'Edit')}</div>
@@ -2894,12 +2967,24 @@ function supplierFormHTML(){
         <div class="old-style-row"><label>Address 2</label><input type="text" value="${esc(d.address2)}" ${dis} oninput="updateSupDraft('address2',this.value)"></div>
         <div class="old-style-row"><label>Phone</label><input type="text" value="${esc(d.phone)}" ${dis} oninput="updateSupDraft('phone',this.value)"></div>
         <div class="old-style-row"><label>GSTIN</label><input type="text" value="${esc(d.gstin)}" ${dis} oninput="updateSupDraft('gstin',this.value)"></div>
+        <div class="old-style-row"><label>Start Date</label><input type="date" value="${esc(d.startDate)}" ${dis} oninput="updateSupDraft('startDate',this.value)"></div>
+        <div class="old-style-row"><label>End Date</label><input type="date" value="${esc(d.endDate)}" ${dis} oninput="updateSupDraft('endDate',this.value)"></div>
       </div>
 
       <div class="card">
         <h3 class="panel-title">Item List</h3>
         ${ro ? '' : `
-        <div class="old-style-row"><label>Magazine</label><select id="supMagSelect" onchange="handleSupMagazineChange(this.value)">${magOptions}</select></div>
+        <div class="old-style-row"><label>Magazine Name</label><select id="supMagSelect" onchange="handleSupMagazineChange(this.value)"><option value="">Select magazine…</option>${magOptions}</select></div>
+        <div class="old-style-row"><label>Magazine Code</label><input type="text" value="${esc(supItemDraft.magazineCode)}" disabled></div>
+        <div class="old-style-row"><label>Sales State</label><select onchange="updateSupItemDraft('salesState',this.value)">
+          <option value="YES" ${supItemDraft.salesState==='YES'?'selected':''}>YES</option>
+          <option value="NO" ${supItemDraft.salesState==='NO'?'selected':''}>NO</option>
+        </select></div>
+        <div class="qty-grid">
+          ${['sun','mon','tue','wed','thu','fri','sat'].map(day=>`
+            <div class="qty-mini"><label>${day} Qty</label><input type="number" min="0" value="${supItemDraft.qty[day]}" oninput="updateSupItemQty('${day}',this.value)"></div>
+          `).join('')}
+        </div>
         <div style="display:flex; gap:8px; margin:14px 0 4px;">
           <button class="btn btn-brass" onclick="addSupItemToList()">+ Add Item</button>
           <button class="btn btn-ghost" onclick="resetSupItemDraft()">Reset Item</button>
@@ -2907,8 +2992,26 @@ function supplierFormHTML(){
         <hr class="rule" style="margin:16px 0;">
         `}
         <table class="skeleton-table" style="font-size:12px;">
-          <thead><tr><th>Code</th><th>Magazine</th><th></th></tr></thead>
+          <thead><tr><th>Code</th><th>Magazine</th><th>Type</th><th>Sales</th><th>Qty</th><th></th></tr></thead>
           <tbody>${itemsRows}</tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <h3 class="panel-title">Hold / Resume Periods</h3>
+        <p style="font-size:11.5px; color:var(--text-muted); margin:-4px 0 12px;">Use this when a supplier stops supply for a stretch and resumes later (e.g. stock shortage, temporary suspension).</p>
+        ${ro ? '' : `
+        <div class="old-style-row"><label>Hold From</label><input type="date" id="supHoldFromInput" value="${esc(supHoldDraft.startDate)}" oninput="updateSupHoldDraft('startDate',this.value)"></div>
+        <div class="old-style-row"><label>Hold To</label><input type="date" id="supHoldToInput" value="${esc(supHoldDraft.endDate)}" oninput="updateSupHoldDraft('endDate',this.value)"></div>
+        <div class="old-style-row"><label>Reason</label><input type="text" value="${esc(supHoldDraft.reason)}" placeholder="Optional — e.g. Stock shortage" oninput="updateSupHoldDraft('reason',this.value)"></div>
+        <div style="display:flex; gap:8px; margin:14px 0 4px;">
+          <button class="btn btn-brass" onclick="addSupHoldToList()">+ Add Hold Period</button>
+        </div>
+        <hr class="rule" style="margin:16px 0;">
+        `}
+        <table class="skeleton-table" style="font-size:12px;">
+          <thead><tr><th>Hold From</th><th>Hold To</th><th>Reason</th><th></th></tr></thead>
+          <tbody>${supHoldsRows}</tbody>
         </table>
       </div>
     </div>
@@ -3421,13 +3524,32 @@ function buildPurchaseDraft(date){
         it.supplierName = sup ? sup.name : 'Unassigned';
       }
     });
+    // Merge in any magazines that exist in Masters but aren't in this saved
+    // record yet — e.g. a supplier/item added to Masters *after* this date
+    // was first posted. Without this, re-opening an already-saved date would
+    // silently hide brand-new suppliers/magazines forever.
+    const knownCodes = new Set(items.map(it=>it.magazineCode));
+    state.masters.magazines.forEach(m=>{
+      if(knownCodes.has(m.code)) return;
+      const rate = m.rates ? Number(m.rates[day]||0) : 0;
+      const sup = state.masters.suppliers.find(s=> (s.items||[]).some(it=>it.magazineCode===m.code));
+      const item = sup ? (sup.items||[]).find(it=>it.magazineCode===m.code) : null;
+      const scheduledQty = sup && item ? getScheduledQty(sup, item, m, date) : 0;
+      items.push({ magazineCode:m.code, magazineName:m.name, supplierCode: sup ? sup.code : '', supplierName: sup ? sup.name : 'Unassigned', qty:scheduledQty, rate, amount: scheduledQty*rate });
+    });
     items.sort((a,b)=> (a.supplierName||'').localeCompare(b.supplierName||'') || a.magazineCode.localeCompare(b.magazineCode));
     return items;
   }
+  // Every magazine is pre-filled with its scheduled qty from the Supplier's
+  // Item List (via getScheduledQty) as a starting suggestion — Purchase
+  // Posting still records what actually arrived, so this value stays fully
+  // editable and is not treated as a guaranteed delivery qty.
   const rows = state.masters.magazines.map(m=>{
     const rate = m.rates ? Number(m.rates[day]||0) : 0;
-    const sup = findSupplierForMagazine(m.code);
-    return { magazineCode:m.code, magazineName:m.name, supplierCode: sup ? sup.code : '', supplierName: sup ? sup.name : 'Unassigned', qty:0, rate, amount:0 };
+    const sup = state.masters.suppliers.find(s=> (s.items||[]).some(it=>it.magazineCode===m.code));
+    const item = sup ? (sup.items||[]).find(it=>it.magazineCode===m.code) : null;
+    const scheduledQty = sup && item ? getScheduledQty(sup, item, m, date) : 0;
+    return { magazineCode:m.code, magazineName:m.name, supplierCode: sup ? sup.code : '', supplierName: sup ? sup.name : 'Unassigned', qty:scheduledQty, rate, amount: scheduledQty*rate };
   });
   rows.sort((a,b)=> (a.supplierName||'').localeCompare(b.supplierName||'') || a.magazineCode.localeCompare(b.magazineCode));
   return rows;
@@ -3439,15 +3561,20 @@ function renderPurchaseModule(){
   content.innerHTML = purchaseEntryHTML();
 }
 
+let purchGroupIndexMap = []; // idx -> group index, rebuilt on every full render; lets
+                              // updatePurchQty patch just the right subtotal row in place.
+
 function purchaseEntryHTML(){
   let rows = '';
   let supplierCount = 0;
+  purchGroupIndexMap = [];
   if(purchDraft && purchDraft.length){
     let lastSupplier = null;
     let groupQty = 0, groupAmt = 0;
+    let groupIdx = -1;
     const flushGroup = ()=>{
       if(lastSupplier!==null){
-        rows += `<tr style="background:#F1F5FB;"><td colspan="2" style="text-align:right; font-weight:600;">Subtotal — ${esc(lastSupplier)}</td><td style="font-weight:600;">${groupQty}</td><td></td><td style="font-weight:600;">${fmtMoney(groupAmt)}</td></tr>`;
+        rows += `<tr style="background:#F1F5FB;"><td colspan="2" style="text-align:right; font-weight:600;">Subtotal — ${esc(lastSupplier)}</td><td style="font-weight:600;" id="purchSubQty-${groupIdx}">${groupQty}</td><td></td><td style="font-weight:600;" id="purchSubAmt-${groupIdx}">${fmtMoney(groupAmt)}</td></tr>`;
       }
     };
     purchDraft.forEach((it,idx)=>{
@@ -3455,18 +3582,20 @@ function purchaseEntryHTML(){
       if(supName!==lastSupplier){
         flushGroup();
         supplierCount++;
+        groupIdx++;
         rows += `<tr><td colspan="5" style="background:var(--ink); color:var(--brass-light); font-weight:600; padding:12px 18px; font-size:12px; letter-spacing:.03em;">${esc(supName)}${it.supplierCode?` <span style="font-family:var(--font-mono); font-weight:400; opacity:.8;">(${esc(it.supplierCode)})</span>`:''}</td></tr>`;
         lastSupplier = supName; groupQty = 0; groupAmt = 0;
       }
       groupQty += Number(it.qty||0);
       groupAmt += Number(it.amount||0);
+      purchGroupIndexMap[idx] = groupIdx;
       rows += `
         <tr>
           <td style="font-family:var(--font-mono);">${esc(it.magazineCode)}</td>
           <td>${esc(it.magazineName)}</td>
           <td><input type="number" min="0" value="${it.qty}" class="qty-input" oninput="updatePurchQty(${idx},this.value)"></td>
           <td>${fmtMoney(it.rate)}</td>
-          <td>${fmtMoney(it.amount)}</td>
+          <td id="purchAmt-${idx}">${fmtMoney(it.amount)}</td>
         </tr>`;
     });
     flushGroup();
@@ -3499,7 +3628,7 @@ function purchaseEntryHTML(){
         <table class="skeleton-table">
           <thead><tr><th>Mag Code</th><th>Magazine Name</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><td colspan="2" style="text-align:right; font-weight:600;">Grand Total</td><td style="font-weight:600;">${totalQty}</td><td></td><td style="font-weight:600;">${fmtMoney(totalAmt)}</td></tr></tfoot>
+          <tfoot><tr><td colspan="2" style="text-align:right; font-weight:600;">Grand Total</td><td style="font-weight:600;" id="purchGrandQty">${totalQty}</td><td></td><td style="font-weight:600;" id="purchGrandAmt">${fmtMoney(totalAmt)}</td></tr></tfoot>
         </table>
         <div class="form-actions" style="margin-top:20px;">
           <button class="btn btn-ghost" onclick="cancelPurchaseEntry()">Cancel</button>
@@ -3517,7 +3646,34 @@ function updatePurchQty(idx,value){
   const qty = value===''?0:Number(value);
   purchDraft[idx].qty = qty;
   purchDraft[idx].amount = qty * Number(purchDraft[idx].rate||0);
-  renderPurchaseModule();
+
+  // Surgical DOM patch only — deliberately NOT a full renderPurchaseModule()
+  // call. Re-rendering the whole table on every keystroke destroys and
+  // recreates this very <input>, which drops keyboard focus mid-type and
+  // makes typing look like it "snaps back" to 0. We only touch the cells
+  // that actually changed: this row's Amount, its supplier's subtotal, and
+  // the Grand Total — the input itself is left alone.
+  const amtCell = document.getElementById(`purchAmt-${idx}`);
+  if(amtCell) amtCell.textContent = fmtMoney(purchDraft[idx].amount);
+
+  const gIdx = purchGroupIndexMap[idx];
+  if(gIdx!==undefined){
+    let groupQty = 0, groupAmt = 0;
+    purchDraft.forEach((it,i)=>{
+      if(purchGroupIndexMap[i]===gIdx){ groupQty += Number(it.qty||0); groupAmt += Number(it.amount||0); }
+    });
+    const subQtyCell = document.getElementById(`purchSubQty-${gIdx}`);
+    const subAmtCell = document.getElementById(`purchSubAmt-${gIdx}`);
+    if(subQtyCell) subQtyCell.textContent = groupQty;
+    if(subAmtCell) subAmtCell.textContent = fmtMoney(groupAmt);
+  }
+
+  const totalQty = purchDraft.reduce((a,it)=>a+Number(it.qty||0),0);
+  const totalAmt = purchDraft.reduce((a,it)=>a+Number(it.amount||0),0);
+  const grandQtyCell = document.getElementById('purchGrandQty');
+  const grandAmtCell = document.getElementById('purchGrandAmt');
+  if(grandQtyCell) grandQtyCell.textContent = totalQty;
+  if(grandAmtCell) grandAmtCell.textContent = fmtMoney(totalAmt);
 }
 function cancelPurchaseEntry(){ purchDraft=null; renderPurchaseModule(); }
 
@@ -3642,7 +3798,7 @@ function salesEntryHTML(){
       <td>${esc(it.magazineName)}</td>
       <td><input type="number" min="0" value="${it.qty}" class="qty-input" oninput="updateSalesQty(${idx},this.value)"></td>
       <td>${fmtMoney(it.rate)}</td>
-      <td>${fmtMoney(it.amount)}</td>
+      <td id="salesAmt-${idx}">${fmtMoney(it.amount)}</td>
     </tr>
   `).join('') : '';
   const totalQty = salesDraft ? salesDraft.reduce((a,it)=>a+Number(it.qty||0),0) : 0;
@@ -3678,7 +3834,7 @@ function salesEntryHTML(){
         <table class="skeleton-table">
           <thead><tr><th>Code</th><th>Customer</th><th>Magazine</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><td colspan="3" style="text-align:right; font-weight:600;">Total</td><td style="font-weight:600;">${totalQty}</td><td></td><td style="font-weight:600;">${fmtMoney(totalAmt)}</td></tr></tfoot>
+          <tfoot><tr><td colspan="3" style="text-align:right; font-weight:600;">Total</td><td style="font-weight:600;" id="salesTotalQty">${totalQty}</td><td></td><td style="font-weight:600;" id="salesTotalAmt">${fmtMoney(totalAmt)}</td></tr></tfoot>
         </table>
         <div class="form-actions" style="margin-top:20px;">
           <button class="btn btn-ghost" onclick="cancelSalesEntry()">Cancel</button>
@@ -3697,7 +3853,17 @@ function updateSalesQty(idx,value){
   const qty = value===''?0:Number(value);
   salesDraft[idx].qty = qty;
   salesDraft[idx].amount = qty * Number(salesDraft[idx].rate||0);
-  renderSalesModule();
+
+  // Surgical DOM patch — see updatePurchQty for why we avoid a full
+  // renderSalesModule() call here (it would drop focus mid-keystroke).
+  const amtCell = document.getElementById(`salesAmt-${idx}`);
+  if(amtCell) amtCell.textContent = fmtMoney(salesDraft[idx].amount);
+  const totalQty = salesDraft.reduce((a,it)=>a+Number(it.qty||0),0);
+  const totalAmt = salesDraft.reduce((a,it)=>a+Number(it.amount||0),0);
+  const totalQtyCell = document.getElementById('salesTotalQty');
+  const totalAmtCell = document.getElementById('salesTotalAmt');
+  if(totalQtyCell) totalQtyCell.textContent = totalQty;
+  if(totalAmtCell) totalAmtCell.textContent = fmtMoney(totalAmt);
 }
 function cancelSalesEntry(){ salesDraft=null; renderSalesModule(); }
 
@@ -5191,17 +5357,18 @@ const REPORTS = {
   'rpt-supplywise': {
     title:'Supply Wise List', hasDate:true, hasArea:true, dateNote:'Filters by Purchase Posting date.',
     areaNote:'Purchase Posting isn\'t linked to an area, so this filter won\'t narrow results yet.',
-    dataCaveat:'Purchase Posting doesn\'t capture which supplier a batch came from yet, so quantities below are combined across all suppliers.',
     columns:[['supplier','Supplier'],['magazine','Magazine'],['suppliedQty','Supplied Qty']],
     getRows(from,to){
       const totals = {};
       state.purchases.filter(p=>within(p.date,from,to)).forEach(p=>{
         p.items.forEach(it=>{
-          if(!totals[it.magazineCode]) totals[it.magazineCode] = { name:it.magazineName, qty:0 };
-          totals[it.magazineCode].qty += Number(it.qty||0);
+          const supKey = it.supplierName || 'Unassigned';
+          const key = supKey+'|'+it.magazineCode;
+          if(!totals[key]) totals[key] = { supplier:supKey, name:it.magazineName, qty:0 };
+          totals[key].qty += Number(it.qty||0);
         });
       });
-      return Object.values(totals).filter(t=>t.qty>0).map(t=>({ supplier:'—', magazine:t.name, suppliedQty:t.qty }));
+      return Object.values(totals).filter(t=>t.qty>0).map(t=>({ supplier:t.supplier, magazine:t.name, suppliedQty:t.qty }));
     }
   },
   'rpt-subscriber-payment': {
@@ -5224,18 +5391,19 @@ const REPORTS = {
   'rpt-supplier-purchase': {
     title:'Supplier Wise Purchase Details', hasDate:true, hasArea:true, dateNote:'Filters by Purchase Posting date.',
     areaNote:'Purchase Posting isn\'t linked to an area, so this filter won\'t narrow results yet.',
-    dataCaveat:'Purchase Posting doesn\'t capture which supplier a batch came from yet, so quantities below are combined across all suppliers.',
     columns:[['supplier','Supplier'],['magazine','Magazine'],['qty','Qty'],['amount','Amount']],
     getRows(from,to){
       const totals = {};
       state.purchases.filter(p=>within(p.date,from,to)).forEach(p=>{
         p.items.forEach(it=>{
-          if(!totals[it.magazineCode]) totals[it.magazineCode] = { name:it.magazineName, qty:0, amount:0 };
-          totals[it.magazineCode].qty += Number(it.qty||0);
-          totals[it.magazineCode].amount += Number(it.amount||0);
+          const supKey = it.supplierName || 'Unassigned';
+          const key = supKey+'|'+it.magazineCode;
+          if(!totals[key]) totals[key] = { supplier:supKey, name:it.magazineName, qty:0, amount:0 };
+          totals[key].qty += Number(it.qty||0);
+          totals[key].amount += Number(it.amount||0);
         });
       });
-      return Object.values(totals).filter(t=>t.qty>0).map(t=>({ supplier:'—', magazine:t.name, qty:t.qty, amount:fmtMoney(t.amount) }));
+      return Object.values(totals).filter(t=>t.qty>0).map(t=>({ supplier:t.supplier, magazine:t.name, qty:t.qty, amount:fmtMoney(t.amount) }));
     }
   },
   'rpt-profit-loss': {
@@ -5667,7 +5835,7 @@ function counterEntryHTML(){
       <td>${esc(it.magazineName)}</td>
       <td><input type="number" min="0" value="${it.qty}" class="qty-input" oninput="updateCounterQty(${idx},this.value)"></td>
       <td>${fmtMoney(it.rate)}</td>
-      <td>${fmtMoney(it.amount)}</td>
+      <td id="counterAmt-${idx}">${fmtMoney(it.amount)}</td>
     </tr>
   `).join('') : `<tr><td colspan="5"><div class="empty-note" style="padding:18px;"><b>No entries yet</b>Pick a Sale Date and click "Post" to load the magazine list.</div></td></tr>`;
   const totalQty = counterDraft ? counterDraft.reduce((a,it)=>a+Number(it.qty||0),0) : 0;
@@ -5694,7 +5862,7 @@ function counterEntryHTML(){
         <table class="skeleton-table">
           <thead><tr><th>Mag Code</th><th>Magazine Name</th><th>Qty</th><th>Rate</th><th>Amount</th></tr></thead>
           <tbody>${rows}</tbody>
-          <tfoot><tr><td colspan="2" style="text-align:right; font-weight:600;">Total</td><td style="font-weight:600;">${totalQty}</td><td></td><td style="font-weight:600;">${fmtMoney(totalAmt)}</td></tr></tfoot>
+          <tfoot><tr><td colspan="2" style="text-align:right; font-weight:600;">Total</td><td style="font-weight:600;" id="counterTotalQty">${totalQty}</td><td></td><td style="font-weight:600;" id="counterTotalAmt">${fmtMoney(totalAmt)}</td></tr></tfoot>
         </table>
         <div class="form-actions" style="margin-top:20px;">
           <button class="btn btn-ghost" onclick="cancelCounterEntry()">Cancel</button>
@@ -5712,7 +5880,17 @@ function updateCounterQty(idx,value){
   const qty = value===''?0:Number(value);
   counterDraft[idx].qty = qty;
   counterDraft[idx].amount = qty * Number(counterDraft[idx].rate||0);
-  renderCounterSalesModule();
+
+  // Surgical DOM patch — see updatePurchQty for why we avoid a full
+  // renderCounterSalesModule() call here (it would drop focus mid-keystroke).
+  const amtCell = document.getElementById(`counterAmt-${idx}`);
+  if(amtCell) amtCell.textContent = fmtMoney(counterDraft[idx].amount);
+  const totalQty = counterDraft.reduce((a,it)=>a+Number(it.qty||0),0);
+  const totalAmt = counterDraft.reduce((a,it)=>a+Number(it.amount||0),0);
+  const totalQtyCell = document.getElementById('counterTotalQty');
+  const totalAmtCell = document.getElementById('counterTotalAmt');
+  if(totalQtyCell) totalQtyCell.textContent = totalQty;
+  if(totalAmtCell) totalAmtCell.textContent = fmtMoney(totalAmt);
 }
 function cancelCounterEntry(){ counterDraft=null; renderCounterSalesModule(); }
 
